@@ -1,0 +1,1065 @@
+<title>Quorum</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;0,9..40,900;1,9..40,700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* arcade: two colours only, navy ink on white */
+    --stage-bg:#ffffff;
+    --paper:#ffffff;
+    --ink:#000040;
+    --ink-dim:rgba(0,0,64,0.55);
+    --mid:rgba(0,0,64,0.3);
+    --cab:#ffffff;
+    --line:#000040;
+    --screen-bg:#ffffff;
+    /* brand palette, used by the invite reveal */
+    --blue:#4f8ef7;
+    --green:#31d0a0;
+    --purple:#a97bf2;
+    --orange:#ffa733;
+    --pink:#ff4d8d;
+    --cream:#fff6e6;
+    --cream-2:#fff0d6;
+    --coal:#241433;
+    --font-pixel:'Press Start 2P', 'Courier New', monospace;
+    --font-body:'DM Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    background:var(--stage-bg);
+    color:var(--ink);
+    font-family:var(--font-body);
+    min-height:100%;
+    padding-inline:16px;
+    padding-block:32px;
+    display:flex;
+    justify-content:center;
+    overflow-x:hidden;
+  }
+  h1,h2,h3,p{margin:0;}
+  button{font-family:inherit;cursor:pointer;}
+
+  .stage{
+    width:100%;
+    max-width:420px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    position:relative;
+  }
+
+  /* ---------- Cabinet ---------- */
+  .cabinet{
+    width:100%;
+    background:var(--cab);
+    border:2px solid var(--line);
+    border-radius:14px;
+    padding:14px;
+    box-shadow:5px 5px 0 var(--ink);
+    position:relative;
+  }
+
+  .hud{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:10px;
+    font-family:var(--font-pixel);
+  }
+  .hud-block{display:flex;flex-direction:column;gap:4px;min-width:0;}
+  .hud-label{
+    font-size:8px;
+    letter-spacing:0.12em;
+    color:var(--ink-dim);
+  }
+  .hud-value{
+    font-size:14px;
+    color:var(--ink);
+    font-variant-numeric:tabular-nums;
+  }
+  .lives{display:flex;gap:5px;}
+  .life-pip{
+    width:11px;height:11px;
+    background:var(--ink);
+    border-radius:2px;
+  }
+  .life-pip.lost{background:transparent;box-shadow:0 0 0 2px var(--ink) inset;}
+  .mute-btn{
+    background:var(--paper);
+    border:2px solid var(--line);
+    color:var(--ink);
+    border-radius:6px;
+    width:30px;height:30px;
+    font-size:13px;
+    line-height:1;
+    display:flex;align-items:center;justify-content:center;
+    flex:none;
+  }
+  .mute-btn:focus-visible,button:focus-visible{outline:2px solid var(--ink);outline-offset:2px;}
+
+  .screen-wrap{
+    position:relative;
+    width:100%;
+    aspect-ratio:2/3;
+    border-radius:6px;
+    overflow:hidden;
+    background:var(--screen-bg);
+    border:2px solid var(--ink);
+  }
+  canvas#game{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    image-rendering:pixelated;
+    image-rendering:crisp-edges;
+    touch-action:none;
+    display:block;
+  }
+  /* labels live on their own higher-res canvas so the type stays sharp
+     while the sprites below stay deliberately chunky */
+  canvas#labels{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    pointer-events:none;
+    display:block;
+  }
+  .overlay{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:14px;
+    text-align:center;
+    padding:20px;
+    background:var(--paper);
+  }
+  /* the cabinet marquee: the brand lockup is white, so it sits on ink */
+  #screen-title{padding-top:96px;}
+  .marquee{
+    position:absolute;
+    top:0;left:0;right:0;
+    background:var(--ink);
+    padding:16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .marquee img{
+    height:44px;
+    width:auto;
+    display:block;
+  }
+  .marquee::after{
+    content:"";
+    position:absolute;
+    left:0;right:0;bottom:0;
+    height:4px;
+    background:linear-gradient(90deg,var(--blue),var(--green) 33%,var(--purple) 66%,var(--orange));
+  }
+  .kicker{
+    font-family:var(--font-pixel);
+    font-size:9px;
+    letter-spacing:0.14em;
+    color:var(--ink-dim);
+  }
+  .title-heading{
+    font-family:var(--font-pixel);
+    font-size:clamp(26px,9.5vw,34px);
+    line-height:1.35;
+    color:var(--ink);
+    text-shadow:4px 4px 0 var(--purple);
+    text-wrap:balance;
+  }
+  /* the lose screen sets two words, so it runs a size down */
+  #screen-lose .title-heading{font-size:clamp(18px,7vw,24px);text-shadow:3px 3px 0 var(--purple);}
+  .title-sub{
+    font-family:var(--font-pixel);
+    font-size:9px;
+    color:var(--ink);
+    letter-spacing:0.08em;
+  }
+  .blurb{
+    font-size:13px;
+    color:var(--ink-dim);
+    max-width:26ch;
+    line-height:1.55;
+  }
+  /* each keyword is set in the colour of the thing it names on screen.
+     hues are the brand ones, darkened enough to hold contrast on white */
+  .blurb b{color:var(--ink);font-weight:700;}
+  .blurb b.c-drink{color:#7d49cf;}
+  .blurb b.c-peer{color:#0f8f68;}
+  .blurb b.c-dodge{color:#d62d6c;}
+
+  .pixel-btn{
+    font-family:var(--font-pixel);
+    font-size:11px;
+    letter-spacing:0.06em;
+    color:var(--ink);
+    background:var(--orange);
+    border:none;
+    padding:14px 22px;
+    border-radius:4px;
+    box-shadow:0 4px 0 #d18415;
+    transition:transform 0.08s ease;
+  }
+  .pixel-btn:active{transform:translateY(3px);box-shadow:0 1px 0 #d18415;}
+  .pixel-btn.ghost{
+    background:var(--paper);
+    color:var(--ink);
+    border:2px solid var(--ink);
+    box-shadow:0 4px 0 var(--mid);
+    font-size:9px;
+    padding:11px 16px;
+  }
+  .pixel-btn.ghost:active{box-shadow:0 1px 0 var(--mid);}
+  .btn-stack{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+  }
+  .link-btn{
+    background:none;
+    border:none;
+    font-family:var(--font-body);
+    font-size:12px;
+    color:var(--ink-dim);
+    text-decoration:underline;
+    text-underline-offset:3px;
+    padding:4px 6px;
+  }
+  .link-btn:hover{color:var(--ink);}
+
+  .hint{
+    font-size:11px;
+    color:var(--ink-dim);
+  }
+
+  .controls-row{
+    margin-top:10px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    font-size:11px;
+    color:var(--ink-dim);
+  }
+  .controls-row svg{flex:none;}
+
+  .toast{
+    position:absolute;
+    top:8px;left:50%;
+    transform:translateX(-50%);
+    font-family:var(--font-pixel);
+    font-size:8px;
+    letter-spacing:0.06em;
+    color:var(--ink);
+    background:var(--paper);
+    border:1px solid var(--ink);
+    padding:6px 9px;
+    border-radius:4px;
+    opacity:0;
+    transition:opacity 0.25s ease;
+    pointer-events:none;
+    white-space:nowrap;
+  }
+  .toast.show{opacity:1;}
+  .toast.good{color:var(--paper);background:var(--ink);border-color:var(--ink);}
+
+  /* ---------- Invite reveal ---------- */
+  .invite-wrap{
+    position:fixed;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px 16px;
+    background:
+      radial-gradient(120% 90% at 12% 100%, var(--orange) 0%, transparent 55%),
+      radial-gradient(120% 100% at 88% 0%, var(--green) 0%, transparent 55%),
+      linear-gradient(135deg, var(--blue) 0%, var(--purple) 55%, var(--pink) 100%);
+    z-index:20;
+    opacity:0;
+    transform:scale(0.96);
+    transition:opacity 0.5s ease, transform 0.5s ease;
+  }
+  .invite-wrap.show{opacity:1;transform:scale(1);}
+  @media (prefers-reduced-motion:reduce){
+    .invite-wrap{transition:none;}
+    .pixel-btn{transition:none;}
+  }
+
+  .invite-card{
+    width:100%;
+    max-width:380px;
+    background:var(--cream);
+    border-radius:22px;
+    padding:30px 26px 26px;
+    box-shadow:0 30px 60px -20px rgba(20,10,40,0.55);
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+    color:var(--coal);
+    max-height:calc(100vh - 48px);
+    overflow-y:auto;
+  }
+  .invite-eyebrow{
+    font-family:var(--font-pixel);
+    font-size:9px;
+    letter-spacing:0.1em;
+    color:var(--purple);
+  }
+  .invite-title{
+    font-family:var(--font-body);
+    font-weight:900;
+    font-size:clamp(30px,9vw,38px);
+    line-height:0.98;
+    letter-spacing:-0.01em;
+    text-wrap:balance;
+    background:linear-gradient(100deg,var(--blue),var(--purple) 55%,var(--orange));
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+  }
+  .invite-lede{
+    font-size:14.5px;
+    line-height:1.55;
+    color:#4a3f57;
+    max-width:38ch;
+  }
+  .invite-series{
+    margin-top:8px;
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:#9a8a63;
+  }
+  .invite-note{
+    font-size:13px;
+    line-height:1.55;
+    color:#7a6f88;
+    max-width:40ch;
+  }
+  /* the question on the table, given the weight it earns */
+  .invite-question{
+    font-size:17px;
+    font-weight:700;
+    line-height:1.4;
+    color:var(--coal);
+    text-wrap:balance;
+  }
+  .invite-details{
+    display:flex;
+    flex-direction:column;
+    border-top:1.5px dashed #d8c9a8;
+    border-bottom:1.5px dashed #d8c9a8;
+    padding-block:14px;
+  }
+  .detail-row{
+    display:flex;
+    align-items:baseline;
+    gap:12px;
+    padding-block:6px;
+  }
+  .detail-label{
+    font-size:10.5px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:#9a8a63;
+    width:64px;
+    flex:none;
+  }
+  .detail-value{
+    font-size:16px;
+    font-weight:700;
+    color:var(--coal);
+  }
+  .invite-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .card-btn{
+    font-family:var(--font-body);
+    font-weight:700;
+    font-size:13px;
+    line-height:1;
+    color:var(--coal);
+    border:1.5px solid transparent;
+    border-radius:8px;
+    padding:12px 18px;
+    cursor:pointer;
+    text-decoration:none;
+    display:inline-block;
+    transition:transform 0.08s ease;
+  }
+  .card-btn.primary{
+    background:var(--green);
+    box-shadow:0 3px 0 #159873;
+  }
+  .card-btn.primary:active{transform:translateY(2px);box-shadow:0 1px 0 #159873;}
+  .card-btn.secondary{
+    background:transparent;
+    border-color:#cdbf9c;
+  }
+  .card-btn:focus-visible{outline:2px solid var(--coal);outline-offset:2px;}
+  .invite-foot{
+    display:flex;
+    align-items:center;
+    margin-top:2px;
+    padding-top:16px;
+    border-top:1.5px dashed #d8c9a8;
+  }
+  .wordmark{
+    height:30px;
+    width:auto;
+    display:block;
+  }
+
+  @media (max-width:380px){
+    .invite-card{padding:24px 18px 20px;}
+    .detail-label{width:56px;font-size:9.5px;}
+  }
+
+  /* belt-and-braces: [hidden] must win over the display rules above regardless of source order */
+  .overlay[hidden],
+  .invite-wrap[hidden],
+  .card-btn[hidden]{display:none !important;}
+</style>
+
+<div class="stage">
+
+  <div class="cabinet">
+    <div class="hud">
+      <div class="hud-block">
+        <span class="hud-label">QUORUM</span>
+        <span class="hud-value" id="score">00</span>
+      </div>
+      <div class="hud-block" style="align-items:center;">
+        <span class="hud-label">PATIENCE</span>
+        <div class="lives" id="lives">
+          <div class="life-pip" data-pip="0"></div>
+          <div class="life-pip" data-pip="1"></div>
+          <div class="life-pip" data-pip="2"></div>
+        </div>
+      </div>
+      <button class="mute-btn" id="muteBtn" type="button" aria-pressed="false" aria-label="Mute sound">&#9834;</button>
+    </div>
+
+    <div class="screen-wrap">
+      <canvas id="game" width="144" height="216" aria-hidden="true"></canvas>
+      <canvas id="labels" width="432" height="648" aria-hidden="true"></canvas>
+      <div class="toast" id="toast"></div>
+
+      <div class="overlay" id="screen-title">
+        <div class="marquee"><img src="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJ4TWlkWU1pZCBtZWV0IiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjIzNi45OTkiIGhlaWdodD0iMTI4IiB2aWV3Qm94PSIwIDAgMjM2Ljk5OSAxMjgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJHcm91cCA5Ij4KPHBhdGggaWQ9IlZlY3RvciIgZD0iTTIwNS40OTMgMTA1LjM0NUwyMTMuMjEgODguMTQwNUwxOTguOTc5IDU0LjY1MjFIMjA5LjEwNEwyMTguMTY2IDc4LjU4MjVMMjI3LjQ0MSA1NC42NTIxSDIzNi45OTlMMjE1LjA1MSAxMDUuMzQ1SDIwNS40OTNaIiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBpZD0iVmVjdG9yXzIiIGQ9Ik0xODIuMDY3IDkwLjYxNUMxNzguNTI3IDkwLjYxNSAxNzUuMzY0IDg5Ljg1OTggMTcyLjU3OSA4OC4zNDk0QzE2OS44NDIgODYuNzkxOCAxNjcuNjk0IDg0LjYyMDYgMTY2LjEzNyA4MS44MzU4QzE2NC41NzkgNzkuMDUxIDE2My44IDc1Ljg0MTQgMTYzLjggNzIuMjA3QzE2My44IDY4LjM4MzggMTY0LjYyNiA2NS4xMDM0IDE2Ni4yNzggNjIuMzY1OEMxNjcuOTc3IDU5LjU4MSAxNzAuMjE5IDU3LjQ1NyAxNzMuMDA0IDU1Ljk5MzhDMTc1LjgzNiA1NC41MzA2IDE3OC45NTEgNTMuNzk5IDE4Mi4zNSA1My43OTlDMTg1Ljg5IDUzLjc5OSAxODkuMDUyIDU0LjU3NzggMTkxLjgzNyA1Ni4xMzU0QzE5NC42MjIgNTcuNjQ1OCAxOTYuODE3IDU5Ljc2OTggMTk4LjQyMSA2Mi41MDc0QzIwMC4wNzMgNjUuMjQ1IDIwMC44OTkgNjguNDc4MiAyMDAuODk5IDcyLjIwN0MyMDAuODk5IDc1Ljc0NyAyMDAuMDk3IDc4LjkwOTQgMTk4LjQ5MiA4MS42OTQyQzE5Ni44ODcgODQuNDc5IDE5NC42NjkgODYuNjczOCAxOTEuODM3IDg4LjI3ODZDMTg5LjA1MiA4OS44MzYyIDE4NS43OTUgOTAuNjE1IDE4Mi4wNjcgOTAuNjE1Wk0xODIuMjA4IDgyLjc1NjJDMTg0LjA5NiA4Mi43NTYyIDE4NS43MjUgODIuMjg0MiAxODcuMDkzIDgxLjM0MDJDMTg4LjUwOSA4MC4zNDkgMTg5LjYxOSA3OS4wNTEgMTkwLjQyMSA3Ny40NDYyQzE5MS4yMjMgNzUuNzk0MiAxOTEuNjI1IDc0LjAwMDYgMTkxLjYyNSA3Mi4wNjU0QzE5MS42MjUgNjkuODQ3IDE5MS4xNzYgNjcuOTU5IDE5MC4yNzkgNjYuNDAxNEMxODkuNDMgNjQuODQzOCAxODguMjk3IDYzLjY2MzggMTg2Ljg4MSA2Mi44NjE0QzE4NS40NjUgNjIuMDU5IDE4My45MDcgNjEuNjU3OCAxODIuMjA4IDYxLjY1NzhDMTgwLjM2NyA2MS42NTc4IDE3OC43MzkgNjIuMTA2MiAxNzcuMzIzIDYzLjAwM0MxNzUuOTU0IDYzLjg5OTggMTc0Ljg2OSA2NS4xNTA2IDE3NC4wNjYgNjYuNzU1NEMxNzMuMzExIDY4LjMxMyAxNzIuOTMzIDcwLjEzMDIgMTcyLjkzMyA3Mi4yMDdDMTcyLjkzMyA3NC4yODM4IDE3My4zMzUgNzYuMTI0NiAxNzQuMTM3IDc3LjcyOTRDMTc0Ljk4NyA3OS4zMzQyIDE3Ni4xMTkgODAuNTg1IDE3Ny41MzUgODEuNDgxOEMxNzguOTUxIDgyLjMzMTQgMTgwLjUwOSA4Mi43NTYyIDE4Mi4yMDggODIuNzU2MloiIGZpbGw9IndoaXRlIi8+CjxwYXRoIGlkPSJWZWN0b3JfMyIgZD0iTTE0NC42MDEgMTA1LjM0NVY5Ny42Mjc3SDE0Ni41MTJDMTQ4LjAyMyA5Ny42Mjc3IDE0OS4xMDggOTcuMzIwOSAxNDkuNzY5IDk2LjcwNzNDMTUwLjQ3NyA5Ni4wOTM3IDE1MC44MzEgOTUuMDU1MyAxNTAuODMxIDkzLjU5MjFWNTQuNjUyMUgxNTkuODkzVjkzLjU5MjFDMTU5Ljg5MyA5Ni41MTg1IDE1OS4zNzQgOTguODMxMyAxNTguMzM2IDEwMC41M0MxNTcuMjk3IDEwMi4yNzcgMTU1Ljg4MSAxMDMuNTA0IDE1NC4wODggMTA0LjIxMkMxNTIuMjk0IDEwNC45NjcgMTUwLjI0MSAxMDUuMzQ1IDE0Ny45MjggMTA1LjM0NUgxNDQuNjAxWiIgZmlsbD0id2hpdGUiLz4KPHBhdGggaWQ9IlZlY3Rvcl80IiBkPSJNMTI0LjMxNyA5MC42NDgxQzEyMC45MTkgOTAuNjQ4MSAxMTcuOTkyIDg5LjgyMjEgMTE1LjUzOCA4OC4xNzAxQzExMy4xMzEgODYuNDcwOSAxMTEuMjY2IDg0LjIyODkgMTA5Ljk0NSA4MS40NDQxQzEwOC42NyA3OC42MTIxIDEwOC4wMzMgNzUuNDk2OSAxMDguMDMzIDcyLjA5ODVDMTA4LjAzMyA2OC43MDAxIDEwOC42OTQgNjUuNjMyMSAxMTAuMDE2IDYyLjg5NDVDMTExLjMzNyA2MC4xMDk3IDExMy4yMjUgNTcuOTE0OSAxMTUuNjggNTYuMzEwMUMxMTguMTM0IDU0LjY1ODEgMTIxLjAxMyA1My44MzIxIDEyNC4zMTcgNTMuODMyMUMxMjYuNTgzIDUzLjgzMjEgMTI4LjczIDU0LjMwNDEgMTMwLjc2IDU1LjI0ODFDMTMyLjgzNyA1Ni4xOTIxIDEzNC41ODMgNTcuNTYwOSAxMzUuOTk5IDU5LjM1NDVWNDAuMjM4NUgxNDUuMTMyVjg5Ljc5ODVIMTM1Ljk5OVY4NC43NzE3QzEzNC44MTkgODYuNzA2OSAxMzMuMTY3IDg4LjE3MDEgMTMxLjA0MyA4OS4xNjEzQzEyOC45MTkgOTAuMTUyNSAxMjYuNjc3IDkwLjY0ODEgMTI0LjMxNyA5MC42NDgxWk0xMjYuNjU0IDgyLjcxODVDMTI4LjU0MiA4Mi43MTg1IDEzMC4xNyA4Mi4yNzAxIDEzMS41MzkgODEuMzczM0MxMzIuOTU1IDgwLjQ3NjUgMTM0LjA2NCA3OS4yNDkzIDEzNC44NjYgNzcuNjkxN0MxMzUuNjY5IDc2LjA4NjkgMTM2LjA3IDc0LjI2OTcgMTM2LjA3IDcyLjI0MDFDMTM2LjA3IDY5LjczODUgMTM1LjU3NCA2Ny43MzI1IDEzNC41ODMgNjYuMjIyMUMxMzMuNTkyIDY0LjY2NDUgMTMyLjM2NSA2My41MzE3IDEzMC45MDIgNjIuODIzN0MxMjkuNDM4IDYyLjExNTcgMTI3Ljk5OSA2MS43NjE3IDEyNi41ODMgNjEuNzYxN0MxMjQuNzQyIDYxLjc2MTcgMTIzLjExNCA2Mi4yMTAxIDEyMS42OTggNjMuMTA2OUMxMjAuMzI5IDY0LjAwMzcgMTE5LjI0MyA2NS4yMzA5IDExOC40NDEgNjYuNzg4NUMxMTcuNjM4IDY4LjI5ODkgMTE3LjIzNyA3MC4wNjg5IDExNy4yMzcgNzIuMDk4NUMxMTcuMjM3IDc0LjA4MDkgMTE3LjYzOCA3NS44NzQ1IDExOC40NDEgNzcuNDc5M0MxMTkuMjQzIDc5LjA4NDEgMTIwLjM1MiA4MC4zNTg1IDEyMS43NjggODEuMzAyNUMxMjMuMTg0IDgyLjI0NjUgMTI0LjgxMyA4Mi43MTg1IDEyNi42NTQgODIuNzE4NVoiIGZpbGw9IndoaXRlIi8+CjxwYXRoIGlkPSJWZWN0b3JfNSIgZD0iTTcwLjYyNTMgODkuNzk4N1Y1NC42ODE5SDc5LjYxNjlWNTguNzg4M0M4MC44NDQxIDU3LjEzNjMgODIuNDcyNSA1NS45MDkxIDg0LjUwMjEgNTUuMTA2N0M4Ni41Nzg5IDU0LjI1NzEgODguNjU1NyA1My44MzIzIDkwLjczMjUgNTMuODMyM0M5NC43OTE3IDUzLjgzMjMgOTguMTE5MyA1NS4xNTM5IDEwMC43MTUgNTcuNzk3MUMxMDMuMzExIDYwLjM5MzEgMTA0LjYwOSA2NC4xNjkxIDEwNC42MDkgNjkuMTI1MVY4OS43OTg3SDk1LjYxNzdWNzAuMzI4N0M5NS42MTc3IDY3LjY4NTUgOTQuOTMzMyA2NS41NjE1IDkzLjU2NDUgNjMuOTU2N0M5Mi4yNDI5IDYyLjMwNDcgOTAuMjg0MSA2MS40Nzg3IDg3LjY4ODEgNjEuNDc4N0M4NS4wOTIxIDYxLjQ3ODcgODMuMDg2MSA2Mi4zMDQ3IDgxLjY3MDEgNjMuOTU2N0M4MC4zMDEzIDY1LjU2MTUgNzkuNjE2OSA2Ny42ODU1IDc5LjYxNjkgNzAuMzI4N1Y4OS43OTg3SDcwLjYyNTNaIiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBpZD0iVmVjdG9yXzYiIGQ9Ik02MC40ODYxIDUwLjE1NDlDNTguODgxMyA1MC4xNTQ5IDU3LjQ4ODkgNDkuNTg4NSA1Ni4zMDg5IDQ4LjQ1NTdDNTUuMTc2MSA0Ny4yNzU3IDU0LjYwOTcgNDUuODgzMyA1NC42MDk3IDQ0LjI3ODVDNTQuNjA5NyA0Mi42MjY1IDU1LjE3NjEgNDEuMjM0MSA1Ni4zMDg5IDQwLjEwMTNDNTcuNDg4OSAzOC45Njg1IDU4Ljg4MTMgMzguNDAyMSA2MC40ODYxIDM4LjQwMjFDNjIuMTM4MSAzOC40MDIxIDYzLjUzMDUgMzguOTY4NSA2NC42NjMzIDQwLjEwMTNDNjUuNzk2MSA0MS4yMzQxIDY2LjM2MjUgNDIuNjI2NSA2Ni4zNjI1IDQ0LjI3ODVDNjYuMzYyNSA0NS44ODMzIDY1Ljc5NjEgNDcuMjc1NyA2NC42NjMzIDQ4LjQ1NTdDNjMuNTMwNSA0OS41ODg1IDYyLjEzODEgNTAuMTU0OSA2MC40ODYxIDUwLjE1NDlaTTU1Ljk1NDkgODkuODAyOVY1NC42ODYxSDY1LjAxNzNWODkuODAyOUg1NS45NTQ5WiIgZmlsbD0id2hpdGUiLz4KPHBhdGggaWQ9IlZlY3Rvcl83IiBkPSJNMCA4OS43OTg1VjQwLjIzODVIMTAuNzYxNkwyNC44NTA4IDcyLjI0MDFMMzguNzI3NiA0MC4yMzg1SDQ5LjQ4OTFWODkuNzk4NUg0MC40MjY4VjU2LjM4MDlMMjguMzIgODMuNDk3M0gyMS4xNjkyTDkuMDYyMzkgNTYuMzgwOVY4OS43OTg1SDBaIiBmaWxsPSJ3aGl0ZSIvPgo8ZyBpZD0iVmVjdG9yXzgiPgo8cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTE4Ni4zNTcgMTA2LjYzOEMxODguMTMxIDEwNy43ODEgMTg4LjY0MyAxMTAuMTQ1IDE4Ny41IDExMS45MTlDMTg0LjEyNiAxMTcuMTU5IDE3My40MTQgMTI2LjU3MiAxNTUuNTE1IDEyNy44NjRDMTM3LjU3NyAxMjkuMTU4IDEyMy42NTYgMTIwLjkxMSAxMTguNjYgMTE2LjMyM0MxMTcuMTA1IDExNC44OTYgMTE3LjAwMiAxMTIuNDc5IDExOC40MjkgMTEwLjkyNEMxMTkuODU2IDEwOS4zNyAxMjIuMjczIDEwOS4yNjcgMTIzLjgyOCAxMTAuNjk0QzEyNy41ODEgMTE0LjE0IDEzOS41MDkgMTIxLjM1NyAxNTQuOTY1IDEyMC4yNDJDMTcwLjQ2MSAxMTkuMTIzIDE3OC45OTkgMTExLjAwNiAxODEuMDc2IDEwNy43ODFDMTgyLjIxOCAxMDYuMDA3IDE4NC41ODMgMTA1LjQ5NSAxODYuMzU3IDEwNi42MzhaIiBmaWxsPSJ3aGl0ZSIvPgo8cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTE5NC4yMDEgOC4wODQxM0MxOTMuNzMzIDcuODU1OTUgMTkyLjY4NiA3LjU0OTM2IDE5MC42NDkgNy42NjgyN0MxODcuNjExIDcuODQ1NTkgMTg1LjAxNiAxMC4wNTA3IDE4MS43NzEgMTQuMjY5NkMxODAuOTk3IDE1LjI3NDYgMTgwLjIzNSAxNi4zMjU3IDE3OS40MzYgMTcuNDI4NEwxNzkuNDI4IDE3LjQzOTVDMTc4LjY0MiAxOC41MjMgMTc3LjgxOSAxOS42NTc2IDE3Ni45NzMgMjAuNzU2QzE3NS4yOTMgMjIuOTM3NyAxNzMuMzYyIDI1LjE5MTkgMTcxLjA2NiAyNi45MzRDMTcwLjEyNSAyNy42NDc5IDE2OC45MjMgMjguMzgzMyAxNjcuNTMzIDI4LjYxOTdDMTY1Ljg0OSAyOC45MDYyIDE2NC4wODYgMjguNDA0MSAxNjIuODU3IDI2Ljk3NjNDMTYxLjg3NCAyNS44MzQ0IDE2MS41NjQgMjQuNDY5MSAxNjEuNDQgMjMuNTcxMUMxNjEuMzAzIDIyLjU4MDkgMTYxLjMxNCAyMS41Mjk4IDE2MS4zODUgMjAuNTM5M0MxNjEuNjQ3IDE2Ljg3OTYgMTYyLjkwNiAxMi4wNTQ5IDE2My45OSA4LjYwOTczQzE2NC4wMDkgOC41NDczNiAxNjQuMDE3IDguNDgxNzggMTY0LjAwMSA4LjQxODM2QzE2My45ODQgOC4zNTI1NCAxNjMuOTY4IDguMzIxMjkgMTYzLjk2MSA4LjMxMTMyQzE2My45MzUgOC4yOTE2NSAxNjMuODU2IDguMjQ0NTcgMTYzLjY4MSA4LjE5ODFDMTYzLjM3IDguMTE1MTkgMTYyLjcyNSA4LjAzMDYyIDE2MS41OTUgOC4yMDE5N0MxNjAuNjY1IDguMzQzMjMgMTU5LjYyNyA4Ljg0NjkxIDE1OC4zOTYgOS45MTg1MkMxNTcuMTQ5IDExLjAwMzggMTU1LjkwNyAxMi40OTE4IDE1NC41NTYgMTQuMjk4M0MxNTQuMDYxIDE0Ljk2MDYgMTUzLjQ3OSAxNS43Njg2IDE1Mi44NzQgMTYuNjA5NEMxNTIuMDQ1IDE3Ljc1OTYgMTUxLjE3MyAxOC45NzExIDE1MC40MTggMTkuOTU0OUMxNDguOTg5IDIxLjgxNTQgMTQ3LjMzNyAyMy43NTUyIDE0NS40MTEgMjUuMjE2NEMxNDMuNjgyIDI2LjUyODYgMTQxLjQ2IDI3Ljc0NTggMTM4Ljk3NCAyNy40MjY4QzEzNi4yMjcgMjcuMDc0NCAxMzQuNjYzIDI1LjA5MDQgMTMzLjgyNCAyMy41MjA5QzEzMi45ODQgMjEuOTQ3NiAxMzIuNDMxIDIwLjAwMjUgMTMxLjk5IDE4LjE0ODZDMTMxLjk3IDE4LjA2ODEgMTMxLjk1MSAxNy45ODY5IDEzMS45MzIgMTcuOTA1MUMxMzEuNzYxIDE3LjE3MjggMTMwLjgxNiAxNi45NzM2IDEzMC4zOTQgMTcuNTk2MUMxMjcuMTE1IDIyLjQzNDMgMTIzLjMzOSAyOS40ODI4IDEyMC44NTIgMzQuNTQ2MkMxMTkuOTIyIDM2LjQ0MDMgMTE3LjYzMiAzNy4yMjE2IDExNS43MzggMzYuMjkxM0MxMTMuODQ0IDM1LjM2MDkgMTEzLjA2MiAzMy4wNzEzIDExMy45OTMgMzEuMTc3MkMxMTYuNTM2IDI1Ljk5ODggMTIwLjQ5NCAxOC41ODE1IDEyNC4wNjkgMTMuMzA4M0MxMjUuNzY1IDEwLjgwNTYgMTI3LjcwNiA4LjI3MzU5IDEyOS42MDMgNi45MjQyNkMxMzAuNDIzIDYuMzQwOTcgMTMyLjM5NSA1LjEzNTg3IDEzNC43MTkgNS45NTg1MkMxMzcuMTUzIDYuODIwNDQgMTM3Ljg5IDkuMTM0MjkgMTM4LjEzOSAxMC4zMTk0QzEzOC4yOTcgMTEuMDcwNyAxMzguNDQzIDExLjc4MzEgMTM4LjU4MiAxMi40NjJDMTM4Ljg3NiAxMy44OTk4IDEzOS4xNCAxNS4xODc2IDEzOS40MjMgMTYuMzc3NUMxMzkuNjgxIDE3LjQ2MDIgMTM5LjkyIDE4LjI5ODkgMTQwLjE0NiAxOC45MzQ4QzE0MC4yNDIgMTkuMjA0MyAxNDAuNTY0IDE5LjMwMTQgMTQwLjc5MiAxOS4xMjg2QzE0MS44ODQgMTguMjk5NyAxNDMuMDM4IDE3LjAxOTEgMTQ0LjM1NiAxNS4zMDEzQzE0NS4xNCAxNC4yODA2IDE0NS44MDIgMTMuMzU2MSAxNDYuNTAyIDEyLjM3ODNDMTQ3LjA4OSAxMS41NTk1IDE0Ny43MDIgMTAuNzAzNCAxNDguNDM2IDkuNzIyMTZDMTQ5Ljg2OCA3LjgwNzI3IDE1MS41MDIgNS43ODg1NCAxNTMuMzc5IDQuMTU0M0MxNTUuMjcyIDIuNTA2NDMgMTU3LjYwNyAxLjA3Nzg0IDE2MC40NDkgMC42NDY1OEMxNjQuMjQ2IDAuMDcwMzUzMiAxNjcuNDcyIDAuODM3MjI2IDE2OS41ODkgMy4xNDE1NkMxNzEuNTQ3IDUuMjcyMiAxNzEuODI0IDcuOTQ3MTMgMTcxLjYwMyA5LjY3ODc0QzE3MS41NzMgOS45MTM3NCAxNzEuNTIyIDEwLjE0NTQgMTcxLjQ0OSAxMC4zNzA4QzE3MC45MTIgMTIuMDMxMyAxNzAuMzU3IDEzLjk2ODIgMTY5LjkwOSAxNS44NTQ2QzE2OS43NzkgMTYuNDAzNCAxNzAuNDA3IDE2LjY5NjggMTcwLjc1MSAxNi4yNUMxNzEuNTIxIDE1LjI1MDEgMTcyLjQ1IDE0LjA0NDkgMTczLjI0OSAxMi45NDI1TDE3My4yNzIgMTIuOTEwM0MxNzQuMDUzIDExLjgzMzUgMTc0Ljg3MiAxMC43MDQ4IDE3NS43MTQgOS42MDk3OUMxNzguOTY0IDUuMzg0OTcgMTgzLjQzMiAwLjQzNDU3NiAxOTAuMjAzIDAuMDM5MzY5NEMxOTMuMDcxIC0wLjEyNzk4IDE5NS41MzcgMC4yMzMzNjkgMTk3LjU1MSAxLjIxNTg0QzE5OS42NDggMi4yMzg5MiAyMDEuMDI0IDMuODI3NzcgMjAxLjc2MyA1LjYxNTk4QzIwMi40NjYgNy4zMTg2MyAyMDIuNTIxIDkuMDE5NDMgMjAyLjM2NCAxMC4zNDMyQzIwMi4yMTQgMTEuNjA0NyAyMDEuODI0IDEyLjkwMzEgMjAxLjIyMiAxMy44Nzc0QzIwMC44NjkgMTQuNDQ4OSAxOTguNjA3IDE4LjU1IDE5Ni43NDkgMjMuMTMyNkMxOTUuODIzIDI1LjQxODQgMTk1LjA1NiAyNy42ODQgMTk0LjY1NiAyOS42MDcyQzE5NC40NTcgMzAuNTY1NyAxOTQuMzY5IDMxLjM0NzEgMTk0LjM3IDMxLjk0NjJDMTk0LjM3IDMyLjU2OTEgMTk0LjQ2NyAzMi43OTkyIDE5NC40NjQgMzIuNzk0N0MxOTUuMzQ1IDM0LjcxMjYgMTk0LjUwMyAzNi45ODA5IDE5Mi41ODYgMzcuODYxMUMxOTAuNjY4IDM4Ljc0MTMgMTg4LjM5OSAzNy45MDAxIDE4Ny41MTkgMzUuOTgyMkMxODYuMzU5IDMzLjQ1MzMgMTg2LjY4NSAzMC40MDc1IDE4Ny4xNzQgMjguMDUzMkMxODcuNzA2IDI1LjQ5MTUgMTg4LjY2IDIyLjc0NzYgMTg5LjY2NyAyMC4yNjIzQzE5MS40MTYgMTUuOTQ2MyAxOTMuNTAyIDExLjk4ODQgMTk0LjQwMiAxMC40MDQ0QzE5NC41NCAxMC4xNjE0IDE5NC43NDMgOS43MTg2NCAxOTQuNzc2IDkuNDQxMDZDMTk0LjgyNSA5LjAyOTQyIDE5NC43NzQgOC43MTQ0NiAxOTQuNjk5IDguNTMyNTVDMTk0LjY1OSA4LjQzNjIxIDE5NC41ODUgOC4yNzE3IDE5NC4yMDEgOC4wODQxM1pNMTM0LjE1MiAxMy4wNzY4QzEzNC4xNTEgMTMuMDc5OCAxMzQuMTIyIDEzLjA5OTIgMTM0LjA2OSAxMy4xMjYyQzEzNC4xMjYgMTMuMDg3MiAxMzQuMTUzIDEzLjA3MzggMTM0LjE1MiAxMy4wNzY4Wk0xMzAuNjQyIDExLjgxMDhDMTMwLjYyNSAxMS43NjUxIDEzMC42MTggMTEuNzM4MSAxMzAuNjE5IDExLjczNkMxMzAuNjIgMTEuNzMzOSAxMzAuNjI5IDExLjc1NjggMTMwLjY0MiAxMS44MTA4WiIgZmlsbD0id2hpdGUiLz4KPC9nPgo8L2c+Cjwvc3ZnPgo=" alt="Mindjoy"></div>
+        <span class="kicker">A FRONTIER CLASS SIDE QUEST</span>
+        <h1 class="title-heading">QUORUM</h1>
+        <span class="title-sub">SUNDOWNERS&nbsp;EDITION</span>
+        <p class="blurb">Catch <b class="c-drink">drinks</b> and <b class="c-peer">the people you came to see</b>. Dodge <b class="c-dodge">committees</b>, A.O.B. and the budget. Ten of them makes quorum.</p>
+        <button class="pixel-btn" id="startBtn" type="button">START</button>
+        <button class="link-btn" id="skipBtn" type="button">Skip to the invite</button>
+      </div>
+
+      <div class="overlay" id="screen-lose" hidden>
+        <span class="kicker">MINUTES TO FOLLOW</span>
+        <h1 class="title-heading">STILL IN<br>COMMITTEE</h1>
+        <p class="blurb">Quorum stalled at <b id="loseScore">0</b> when the agenda caught up with you. Escape again, or go straight to the invite.</p>
+        <div class="btn-stack">
+          <button class="pixel-btn" id="retryBtn" type="button">TRY AGAIN</button>
+          <button class="pixel-btn ghost" id="seeInviteBtn" type="button">SEE THE INVITE</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls-row">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2v12M3 5l5-3 5 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Drag / arrow keys to move</span>
+    </div>
+  </div>
+
+  <div class="invite-wrap" id="screen-win">
+    <div class="invite-card">
+      <div>
+        <span class="invite-eyebrow">YOU'RE INVITED</span>
+        <h2 class="invite-title">Frontier Sundowners</h2>
+        <p class="invite-series">As part of the Frontier Class</p>
+      </div>
+      <p class="invite-lede">Join colleagues for drinks to informally discuss:</p>
+      <p class="invite-question">In the age of AI, what is the importance of a degree?</p>
+      <p class="invite-note">No Pitch. No Presentations. Just like-minded individuals coming together who care about the future of learning.</p>
+
+      <div class="invite-details">
+        <div class="detail-row">
+          <span class="detail-label">Date</span>
+          <span class="detail-value">Wednesday, September 30</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Time</span>
+          <span class="detail-value">5:30 &ndash; 7:30 PM</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Place</span>
+          <span class="detail-value">The Athletic Club &amp; Social</span>
+        </div>
+      </div>
+
+
+      <div class="invite-actions">
+        <a class="card-btn primary" id="rsvpBtn" href="#" target="_blank" rel="noopener" hidden>RSVP</a>
+        <button class="card-btn secondary" id="playAgainBtn" type="button">Play Again</button>
+      </div>
+
+      <div class="invite-foot">
+        <img class="wordmark" id="footLogo" alt="Mindjoy" src="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJ4TWlkWU1pZCBtZWV0IiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjIzNi45OTkiIGhlaWdodD0iMTI4IiB2aWV3Qm94PSIwIDAgMjM2Ljk5OSAxMjgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJHcm91cCA5Ij4KPHBhdGggaWQ9IlZlY3RvciIgZD0iTTIwNS40OTMgMTA1LjM0NUwyMTMuMjEgODguMTQwNUwxOTguOTc5IDU0LjY1MjFIMjA5LjEwNEwyMTguMTY2IDc4LjU4MjVMMjI3LjQ0MSA1NC42NTIxSDIzNi45OTlMMjE1LjA1MSAxMDUuMzQ1SDIwNS40OTNaIiBmaWxsPSIjMDAwMDQwIi8+CjxwYXRoIGlkPSJWZWN0b3JfMiIgZD0iTTE4Mi4wNjcgOTAuNjE1QzE3OC41MjcgOTAuNjE1IDE3NS4zNjQgODkuODU5OCAxNzIuNTc5IDg4LjM0OTRDMTY5Ljg0MiA4Ni43OTE4IDE2Ny42OTQgODQuNjIwNiAxNjYuMTM3IDgxLjgzNThDMTY0LjU3OSA3OS4wNTEgMTYzLjggNzUuODQxNCAxNjMuOCA3Mi4yMDdDMTYzLjggNjguMzgzOCAxNjQuNjI2IDY1LjEwMzQgMTY2LjI3OCA2Mi4zNjU4QzE2Ny45NzcgNTkuNTgxIDE3MC4yMTkgNTcuNDU3IDE3My4wMDQgNTUuOTkzOEMxNzUuODM2IDU0LjUzMDYgMTc4Ljk1MSA1My43OTkgMTgyLjM1IDUzLjc5OUMxODUuODkgNTMuNzk5IDE4OS4wNTIgNTQuNTc3OCAxOTEuODM3IDU2LjEzNTRDMTk0LjYyMiA1Ny42NDU4IDE5Ni44MTcgNTkuNzY5OCAxOTguNDIxIDYyLjUwNzRDMjAwLjA3MyA2NS4yNDUgMjAwLjg5OSA2OC40NzgyIDIwMC44OTkgNzIuMjA3QzIwMC44OTkgNzUuNzQ3IDIwMC4wOTcgNzguOTA5NCAxOTguNDkyIDgxLjY5NDJDMTk2Ljg4NyA4NC40NzkgMTk0LjY2OSA4Ni42NzM4IDE5MS44MzcgODguMjc4NkMxODkuMDUyIDg5LjgzNjIgMTg1Ljc5NSA5MC42MTUgMTgyLjA2NyA5MC42MTVaTTE4Mi4yMDggODIuNzU2MkMxODQuMDk2IDgyLjc1NjIgMTg1LjcyNSA4Mi4yODQyIDE4Ny4wOTMgODEuMzQwMkMxODguNTA5IDgwLjM0OSAxODkuNjE5IDc5LjA1MSAxOTAuNDIxIDc3LjQ0NjJDMTkxLjIyMyA3NS43OTQyIDE5MS42MjUgNzQuMDAwNiAxOTEuNjI1IDcyLjA2NTRDMTkxLjYyNSA2OS44NDcgMTkxLjE3NiA2Ny45NTkgMTkwLjI3OSA2Ni40MDE0QzE4OS40MyA2NC44NDM4IDE4OC4yOTcgNjMuNjYzOCAxODYuODgxIDYyLjg2MTRDMTg1LjQ2NSA2Mi4wNTkgMTgzLjkwNyA2MS42NTc4IDE4Mi4yMDggNjEuNjU3OEMxODAuMzY3IDYxLjY1NzggMTc4LjczOSA2Mi4xMDYyIDE3Ny4zMjMgNjMuMDAzQzE3NS45NTQgNjMuODk5OCAxNzQuODY5IDY1LjE1MDYgMTc0LjA2NiA2Ni43NTU0QzE3My4zMTEgNjguMzEzIDE3Mi45MzMgNzAuMTMwMiAxNzIuOTMzIDcyLjIwN0MxNzIuOTMzIDc0LjI4MzggMTczLjMzNSA3Ni4xMjQ2IDE3NC4xMzcgNzcuNzI5NEMxNzQuOTg3IDc5LjMzNDIgMTc2LjExOSA4MC41ODUgMTc3LjUzNSA4MS40ODE4QzE3OC45NTEgODIuMzMxNCAxODAuNTA5IDgyLjc1NjIgMTgyLjIwOCA4Mi43NTYyWiIgZmlsbD0iIzAwMDA0MCIvPgo8cGF0aCBpZD0iVmVjdG9yXzMiIGQ9Ik0xNDQuNjAxIDEwNS4zNDVWOTcuNjI3N0gxNDYuNTEyQzE0OC4wMjMgOTcuNjI3NyAxNDkuMTA4IDk3LjMyMDkgMTQ5Ljc2OSA5Ni43MDczQzE1MC40NzcgOTYuMDkzNyAxNTAuODMxIDk1LjA1NTMgMTUwLjgzMSA5My41OTIxVjU0LjY1MjFIMTU5Ljg5M1Y5My41OTIxQzE1OS44OTMgOTYuNTE4NSAxNTkuMzc0IDk4LjgzMTMgMTU4LjMzNiAxMDAuNTNDMTU3LjI5NyAxMDIuMjc3IDE1NS44ODEgMTAzLjUwNCAxNTQuMDg4IDEwNC4yMTJDMTUyLjI5NCAxMDQuOTY3IDE1MC4yNDEgMTA1LjM0NSAxNDcuOTI4IDEwNS4zNDVIMTQ0LjYwMVoiIGZpbGw9IiMwMDAwNDAiLz4KPHBhdGggaWQ9IlZlY3Rvcl80IiBkPSJNMTI0LjMxNyA5MC42NDgxQzEyMC45MTkgOTAuNjQ4MSAxMTcuOTkyIDg5LjgyMjEgMTE1LjUzOCA4OC4xNzAxQzExMy4xMzEgODYuNDcwOSAxMTEuMjY2IDg0LjIyODkgMTA5Ljk0NSA4MS40NDQxQzEwOC42NyA3OC42MTIxIDEwOC4wMzMgNzUuNDk2OSAxMDguMDMzIDcyLjA5ODVDMTA4LjAzMyA2OC43MDAxIDEwOC42OTQgNjUuNjMyMSAxMTAuMDE2IDYyLjg5NDVDMTExLjMzNyA2MC4xMDk3IDExMy4yMjUgNTcuOTE0OSAxMTUuNjggNTYuMzEwMUMxMTguMTM0IDU0LjY1ODEgMTIxLjAxMyA1My44MzIxIDEyNC4zMTcgNTMuODMyMUMxMjYuNTgzIDUzLjgzMjEgMTI4LjczIDU0LjMwNDEgMTMwLjc2IDU1LjI0ODFDMTMyLjgzNyA1Ni4xOTIxIDEzNC41ODMgNTcuNTYwOSAxMzUuOTk5IDU5LjM1NDVWNDAuMjM4NUgxNDUuMTMyVjg5Ljc5ODVIMTM1Ljk5OVY4NC43NzE3QzEzNC44MTkgODYuNzA2OSAxMzMuMTY3IDg4LjE3MDEgMTMxLjA0MyA4OS4xNjEzQzEyOC45MTkgOTAuMTUyNSAxMjYuNjc3IDkwLjY0ODEgMTI0LjMxNyA5MC42NDgxWk0xMjYuNjU0IDgyLjcxODVDMTI4LjU0MiA4Mi43MTg1IDEzMC4xNyA4Mi4yNzAxIDEzMS41MzkgODEuMzczM0MxMzIuOTU1IDgwLjQ3NjUgMTM0LjA2NCA3OS4yNDkzIDEzNC44NjYgNzcuNjkxN0MxMzUuNjY5IDc2LjA4NjkgMTM2LjA3IDc0LjI2OTcgMTM2LjA3IDcyLjI0MDFDMTM2LjA3IDY5LjczODUgMTM1LjU3NCA2Ny43MzI1IDEzNC41ODMgNjYuMjIyMUMxMzMuNTkyIDY0LjY2NDUgMTMyLjM2NSA2My41MzE3IDEzMC45MDIgNjIuODIzN0MxMjkuNDM4IDYyLjExNTcgMTI3Ljk5OSA2MS43NjE3IDEyNi41ODMgNjEuNzYxN0MxMjQuNzQyIDYxLjc2MTcgMTIzLjExNCA2Mi4yMTAxIDEyMS42OTggNjMuMTA2OUMxMjAuMzI5IDY0LjAwMzcgMTE5LjI0MyA2NS4yMzA5IDExOC40NDEgNjYuNzg4NUMxMTcuNjM4IDY4LjI5ODkgMTE3LjIzNyA3MC4wNjg5IDExNy4yMzcgNzIuMDk4NUMxMTcuMjM3IDc0LjA4MDkgMTE3LjYzOCA3NS44NzQ1IDExOC40NDEgNzcuNDc5M0MxMTkuMjQzIDc5LjA4NDEgMTIwLjM1MiA4MC4zNTg1IDEyMS43NjggODEuMzAyNUMxMjMuMTg0IDgyLjI0NjUgMTI0LjgxMyA4Mi43MTg1IDEyNi42NTQgODIuNzE4NVoiIGZpbGw9IiMwMDAwNDAiLz4KPHBhdGggaWQ9IlZlY3Rvcl81IiBkPSJNNzAuNjI1MyA4OS43OTg3VjU0LjY4MTlINzkuNjE2OVY1OC43ODgzQzgwLjg0NDEgNTcuMTM2MyA4Mi40NzI1IDU1LjkwOTEgODQuNTAyMSA1NS4xMDY3Qzg2LjU3ODkgNTQuMjU3MSA4OC42NTU3IDUzLjgzMjMgOTAuNzMyNSA1My44MzIzQzk0Ljc5MTcgNTMuODMyMyA5OC4xMTkzIDU1LjE1MzkgMTAwLjcxNSA1Ny43OTcxQzEwMy4zMTEgNjAuMzkzMSAxMDQuNjA5IDY0LjE2OTEgMTA0LjYwOSA2OS4xMjUxVjg5Ljc5ODdIOTUuNjE3N1Y3MC4zMjg3Qzk1LjYxNzcgNjcuNjg1NSA5NC45MzMzIDY1LjU2MTUgOTMuNTY0NSA2My45NTY3QzkyLjI0MjkgNjIuMzA0NyA5MC4yODQxIDYxLjQ3ODcgODcuNjg4MSA2MS40Nzg3Qzg1LjA5MjEgNjEuNDc4NyA4My4wODYxIDYyLjMwNDcgODEuNjcwMSA2My45NTY3QzgwLjMwMTMgNjUuNTYxNSA3OS42MTY5IDY3LjY4NTUgNzkuNjE2OSA3MC4zMjg3Vjg5Ljc5ODdINzAuNjI1M1oiIGZpbGw9IiMwMDAwNDAiLz4KPHBhdGggaWQ9IlZlY3Rvcl82IiBkPSJNNjAuNDg2MSA1MC4xNTQ5QzU4Ljg4MTMgNTAuMTU0OSA1Ny40ODg5IDQ5LjU4ODUgNTYuMzA4OSA0OC40NTU3QzU1LjE3NjEgNDcuMjc1NyA1NC42MDk3IDQ1Ljg4MzMgNTQuNjA5NyA0NC4yNzg1QzU0LjYwOTcgNDIuNjI2NSA1NS4xNzYxIDQxLjIzNDEgNTYuMzA4OSA0MC4xMDEzQzU3LjQ4ODkgMzguOTY4NSA1OC44ODEzIDM4LjQwMjEgNjAuNDg2MSAzOC40MDIxQzYyLjEzODEgMzguNDAyMSA2My41MzA1IDM4Ljk2ODUgNjQuNjYzMyA0MC4xMDEzQzY1Ljc5NjEgNDEuMjM0MSA2Ni4zNjI1IDQyLjYyNjUgNjYuMzYyNSA0NC4yNzg1QzY2LjM2MjUgNDUuODgzMyA2NS43OTYxIDQ3LjI3NTcgNjQuNjYzMyA0OC40NTU3QzYzLjUzMDUgNDkuNTg4NSA2Mi4xMzgxIDUwLjE1NDkgNjAuNDg2MSA1MC4xNTQ5Wk01NS45NTQ5IDg5LjgwMjlWNTQuNjg2MUg2NS4wMTczVjg5LjgwMjlINTUuOTU0OVoiIGZpbGw9IiMwMDAwNDAiLz4KPHBhdGggaWQ9IlZlY3Rvcl83IiBkPSJNMCA4OS43OTg1VjQwLjIzODVIMTAuNzYxNkwyNC44NTA4IDcyLjI0MDFMMzguNzI3NiA0MC4yMzg1SDQ5LjQ4OTFWODkuNzk4NUg0MC40MjY4VjU2LjM4MDlMMjguMzIgODMuNDk3M0gyMS4xNjkyTDkuMDYyMzkgNTYuMzgwOVY4OS43OTg1SDBaIiBmaWxsPSIjMDAwMDQwIi8+CjxnIGlkPSJWZWN0b3JfOCI+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMTg2LjM1NyAxMDYuNjM4QzE4OC4xMzEgMTA3Ljc4MSAxODguNjQzIDExMC4xNDUgMTg3LjUgMTExLjkxOUMxODQuMTI2IDExNy4xNTkgMTczLjQxNCAxMjYuNTcyIDE1NS41MTUgMTI3Ljg2NEMxMzcuNTc3IDEyOS4xNTggMTIzLjY1NiAxMjAuOTExIDExOC42NiAxMTYuMzIzQzExNy4xMDUgMTE0Ljg5NiAxMTcuMDAyIDExMi40NzkgMTE4LjQyOSAxMTAuOTI0QzExOS44NTYgMTA5LjM3IDEyMi4yNzMgMTA5LjI2NyAxMjMuODI4IDExMC42OTRDMTI3LjU4MSAxMTQuMTQgMTM5LjUwOSAxMjEuMzU3IDE1NC45NjUgMTIwLjI0MkMxNzAuNDYxIDExOS4xMjMgMTc4Ljk5OSAxMTEuMDA2IDE4MS4wNzYgMTA3Ljc4MUMxODIuMjE4IDEwNi4wMDcgMTg0LjU4MyAxMDUuNDk1IDE4Ni4zNTcgMTA2LjYzOFoiIGZpbGw9IiMwMDAwNDAiLz4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xOTQuMjAxIDguMDg0MTNDMTkzLjczMyA3Ljg1NTk1IDE5Mi42ODYgNy41NDkzNiAxOTAuNjQ5IDcuNjY4MjdDMTg3LjYxMSA3Ljg0NTU5IDE4NS4wMTYgMTAuMDUwNyAxODEuNzcxIDE0LjI2OTZDMTgwLjk5NyAxNS4yNzQ2IDE4MC4yMzUgMTYuMzI1NyAxNzkuNDM2IDE3LjQyODRMMTc5LjQyOCAxNy40Mzk1QzE3OC42NDIgMTguNTIzIDE3Ny44MTkgMTkuNjU3NiAxNzYuOTczIDIwLjc1NkMxNzUuMjkzIDIyLjkzNzcgMTczLjM2MiAyNS4xOTE5IDE3MS4wNjYgMjYuOTM0QzE3MC4xMjUgMjcuNjQ3OSAxNjguOTIzIDI4LjM4MzMgMTY3LjUzMyAyOC42MTk3QzE2NS44NDkgMjguOTA2MiAxNjQuMDg2IDI4LjQwNDEgMTYyLjg1NyAyNi45NzYzQzE2MS44NzQgMjUuODM0NCAxNjEuNTY0IDI0LjQ2OTEgMTYxLjQ0IDIzLjU3MTFDMTYxLjMwMyAyMi41ODA5IDE2MS4zMTQgMjEuNTI5OCAxNjEuMzg1IDIwLjUzOTNDMTYxLjY0NyAxNi44Nzk2IDE2Mi45MDYgMTIuMDU0OSAxNjMuOTkgOC42MDk3M0MxNjQuMDA5IDguNTQ3MzYgMTY0LjAxNyA4LjQ4MTc4IDE2NC4wMDEgOC40MTgzNkMxNjMuOTg0IDguMzUyNTQgMTYzLjk2OCA4LjMyMTI5IDE2My45NjEgOC4zMTEzMkMxNjMuOTM1IDguMjkxNjUgMTYzLjg1NiA4LjI0NDU3IDE2My42ODEgOC4xOTgxQzE2My4zNyA4LjExNTE5IDE2Mi43MjUgOC4wMzA2MiAxNjEuNTk1IDguMjAxOTdDMTYwLjY2NSA4LjM0MzIzIDE1OS42MjcgOC44NDY5MSAxNTguMzk2IDkuOTE4NTJDMTU3LjE0OSAxMS4wMDM4IDE1NS45MDcgMTIuNDkxOCAxNTQuNTU2IDE0LjI5ODNDMTU0LjA2MSAxNC45NjA2IDE1My40NzkgMTUuNzY4NiAxNTIuODc0IDE2LjYwOTRDMTUyLjA0NSAxNy43NTk2IDE1MS4xNzMgMTguOTcxMSAxNTAuNDE4IDE5Ljk1NDlDMTQ4Ljk4OSAyMS44MTU0IDE0Ny4zMzcgMjMuNzU1MiAxNDUuNDExIDI1LjIxNjRDMTQzLjY4MiAyNi41Mjg2IDE0MS40NiAyNy43NDU4IDEzOC45NzQgMjcuNDI2OEMxMzYuMjI3IDI3LjA3NDQgMTM0LjY2MyAyNS4wOTA0IDEzMy44MjQgMjMuNTIwOUMxMzIuOTg0IDIxLjk0NzYgMTMyLjQzMSAyMC4wMDI1IDEzMS45OSAxOC4xNDg2QzEzMS45NyAxOC4wNjgxIDEzMS45NTEgMTcuOTg2OSAxMzEuOTMyIDE3LjkwNTFDMTMxLjc2MSAxNy4xNzI4IDEzMC44MTYgMTYuOTczNiAxMzAuMzk0IDE3LjU5NjFDMTI3LjExNSAyMi40MzQzIDEyMy4zMzkgMjkuNDgyOCAxMjAuODUyIDM0LjU0NjJDMTE5LjkyMiAzNi40NDAzIDExNy42MzIgMzcuMjIxNiAxMTUuNzM4IDM2LjI5MTNDMTEzLjg0NCAzNS4zNjA5IDExMy4wNjIgMzMuMDcxMyAxMTMuOTkzIDMxLjE3NzJDMTE2LjUzNiAyNS45OTg4IDEyMC40OTQgMTguNTgxNSAxMjQuMDY5IDEzLjMwODNDMTI1Ljc2NSAxMC44MDU2IDEyNy43MDYgOC4yNzM1OSAxMjkuNjAzIDYuOTI0MjZDMTMwLjQyMyA2LjM0MDk3IDEzMi4zOTUgNS4xMzU4NyAxMzQuNzE5IDUuOTU4NTJDMTM3LjE1MyA2LjgyMDQ0IDEzNy44OSA5LjEzNDI5IDEzOC4xMzkgMTAuMzE5NEMxMzguMjk3IDExLjA3MDcgMTM4LjQ0MyAxMS43ODMxIDEzOC41ODIgMTIuNDYyQzEzOC44NzYgMTMuODk5OCAxMzkuMTQgMTUuMTg3NiAxMzkuNDIzIDE2LjM3NzVDMTM5LjY4MSAxNy40NjAyIDEzOS45MiAxOC4yOTg5IDE0MC4xNDYgMTguOTM0OEMxNDAuMjQyIDE5LjIwNDMgMTQwLjU2NCAxOS4zMDE0IDE0MC43OTIgMTkuMTI4NkMxNDEuODg0IDE4LjI5OTcgMTQzLjAzOCAxNy4wMTkxIDE0NC4zNTYgMTUuMzAxM0MxNDUuMTQgMTQuMjgwNiAxNDUuODAyIDEzLjM1NjEgMTQ2LjUwMiAxMi4zNzgzQzE0Ny4wODkgMTEuNTU5NSAxNDcuNzAyIDEwLjcwMzQgMTQ4LjQzNiA5LjcyMjE2QzE0OS44NjggNy44MDcyNyAxNTEuNTAyIDUuNzg4NTQgMTUzLjM3OSA0LjE1NDNDMTU1LjI3MiAyLjUwNjQzIDE1Ny42MDcgMS4wNzc4NCAxNjAuNDQ5IDAuNjQ2NThDMTY0LjI0NiAwLjA3MDM1MzIgMTY3LjQ3MiAwLjgzNzIyNiAxNjkuNTg5IDMuMTQxNTZDMTcxLjU0NyA1LjI3MjIgMTcxLjgyNCA3Ljk0NzEzIDE3MS42MDMgOS42Nzg3NEMxNzEuNTczIDkuOTEzNzQgMTcxLjUyMiAxMC4xNDU0IDE3MS40NDkgMTAuMzcwOEMxNzAuOTEyIDEyLjAzMTMgMTcwLjM1NyAxMy45NjgyIDE2OS45MDkgMTUuODU0NkMxNjkuNzc5IDE2LjQwMzQgMTcwLjQwNyAxNi42OTY4IDE3MC43NTEgMTYuMjVDMTcxLjUyMSAxNS4yNTAxIDE3Mi40NSAxNC4wNDQ5IDE3My4yNDkgMTIuOTQyNUwxNzMuMjcyIDEyLjkxMDNDMTc0LjA1MyAxMS44MzM1IDE3NC44NzIgMTAuNzA0OCAxNzUuNzE0IDkuNjA5NzlDMTc4Ljk2NCA1LjM4NDk3IDE4My40MzIgMC40MzQ1NzYgMTkwLjIwMyAwLjAzOTM2OTRDMTkzLjA3MSAtMC4xMjc5OCAxOTUuNTM3IDAuMjMzMzY5IDE5Ny41NTEgMS4yMTU4NEMxOTkuNjQ4IDIuMjM4OTIgMjAxLjAyNCAzLjgyNzc3IDIwMS43NjMgNS42MTU5OEMyMDIuNDY2IDcuMzE4NjMgMjAyLjUyMSA5LjAxOTQzIDIwMi4zNjQgMTAuMzQzMkMyMDIuMjE0IDExLjYwNDcgMjAxLjgyNCAxMi45MDMxIDIwMS4yMjIgMTMuODc3NEMyMDAuODY5IDE0LjQ0ODkgMTk4LjYwNyAxOC41NSAxOTYuNzQ5IDIzLjEzMjZDMTk1LjgyMyAyNS40MTg0IDE5NS4wNTYgMjcuNjg0IDE5NC42NTYgMjkuNjA3MkMxOTQuNDU3IDMwLjU2NTcgMTk0LjM2OSAzMS4zNDcxIDE5NC4zNyAzMS45NDYyQzE5NC4zNyAzMi41NjkxIDE5NC40NjcgMzIuNzk5MiAxOTQuNDY0IDMyLjc5NDdDMTk1LjM0NSAzNC43MTI2IDE5NC41MDMgMzYuOTgwOSAxOTIuNTg2IDM3Ljg2MTFDMTkwLjY2OCAzOC43NDEzIDE4OC4zOTkgMzcuOTAwMSAxODcuNTE5IDM1Ljk4MjJDMTg2LjM1OSAzMy40NTMzIDE4Ni42ODUgMzAuNDA3NSAxODcuMTc0IDI4LjA1MzJDMTg3LjcwNiAyNS40OTE1IDE4OC42NiAyMi43NDc2IDE4OS42NjcgMjAuMjYyM0MxOTEuNDE2IDE1Ljk0NjMgMTkzLjUwMiAxMS45ODg0IDE5NC40MDIgMTAuNDA0NEMxOTQuNTQgMTAuMTYxNCAxOTQuNzQzIDkuNzE4NjQgMTk0Ljc3NiA5LjQ0MTA2QzE5NC44MjUgOS4wMjk0MiAxOTQuNzc0IDguNzE0NDYgMTk0LjY5OSA4LjUzMjU1QzE5NC42NTkgOC40MzYyMSAxOTQuNTg1IDguMjcxNyAxOTQuMjAxIDguMDg0MTNaTTEzNC4xNTIgMTMuMDc2OEMxMzQuMTUxIDEzLjA3OTggMTM0LjEyMiAxMy4wOTkyIDEzNC4wNjkgMTMuMTI2MkMxMzQuMTI2IDEzLjA4NzIgMTM0LjE1MyAxMy4wNzM4IDEzNC4xNTIgMTMuMDc2OFpNMTMwLjY0MiAxMS44MTA4QzEzMC42MjUgMTEuNzY1MSAxMzAuNjE4IDExLjczODEgMTMwLjYxOSAxMS43MzZDMTMwLjYyIDExLjczMzkgMTMwLjYyOSAxMS43NTY4IDEzMC42NDIgMTEuODEwOFoiIGZpbGw9IiMwMDAwNDAiLz4KPC9nPgo8L2c+Cjwvc3ZnPgo=">
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var canvas = document.getElementById('game');
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  ctx.imageSmoothingEnabled = false;
+
+  var lcanvas = document.getElementById('labels');
+  var lctx = lcanvas.getContext('2d');
+  var LW = lcanvas.width, LH = lcanvas.height;
+  var LSCALE = LW / W;
+
+  var screenTitle = document.getElementById('screen-title');
+  var screenLose = document.getElementById('screen-lose');
+  var screenWin = document.getElementById('screen-win');
+  var toastEl = document.getElementById('toast');
+  var scoreEl = document.getElementById('score');
+  var loseScoreEl = document.getElementById('loseScore');
+  var pips = document.querySelectorAll('.life-pip');
+  var muteBtn = document.getElementById('muteBtn');
+
+  var WIN_SCORE = 10;
+  var MAX_LIVES = 3;
+
+  // navy line art on white, brand colour inside the fills
+  var PALETTE = {
+    paper:'#ffffff', ink:'#000040',
+    gown:'#4f8ef7', skin:'#f3d3a0', tassel:'#ffa733',
+    wine:'#a97bf2', olive:'#7bbf5e',
+    beer:'#ffa733', beerDark:'#d18415',
+    peer:'#31d0a0',
+    pink:'#ff4d8d', pinkDark:'#c72f68'
+  };
+
+  var state = 'title'; // title | playing | lose | win
+  var score = 0, lives = MAX_LIVES;
+  var player = { x: W/2, targetX: W/2, y: H-30, w: 20, h: 16 };
+  var items = [];
+  var spawnTimer = 0;
+  var lastTs = 0;
+  var flash = 0; // 0..1, tints screen on catch/hit
+  var flashColor = '#000040';
+  var keys = { left:false, right:false };
+  var raf = null;
+
+  /* ---------------- audio ---------------- */
+  var audioCtx = null;
+  var muted = false;
+  try { muted = localStorage.getItem('poph_muted') === '1'; } catch(e){}
+  updateMuteUI();
+
+  function ensureAudio(){
+    if (audioCtx) return;
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){}
+  }
+  function beep(freq, dur, type, gainVal, delay){
+    if (muted || !audioCtx) return;
+    try{
+      var t0 = audioCtx.currentTime + (delay||0);
+      var o = audioCtx.createOscillator();
+      var g = audioCtx.createGain();
+      o.type = type || 'square';
+      o.frequency.setValueAtTime(freq, t0);
+      g.gain.setValueAtTime(gainVal||0.05, t0);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + (dur||0.08));
+      o.connect(g).connect(audioCtx.destination);
+      o.start(t0);
+      o.stop(t0 + (dur||0.08) + 0.02);
+    } catch(e){}
+  }
+  function sfxCatch(){ beep(920, 0.07, 'square', 0.05); beep(1300, 0.06, 'square', 0.035, 0.05); }
+  function sfxHit(){ beep(160, 0.18, 'sawtooth', 0.06); }
+  function sfxWin(){
+    [523,659,784,1046].forEach(function(f,i){ beep(f, 0.16, 'square', 0.05, i*0.12); });
+  }
+  function sfxLose(){
+    [392,349,294,220].forEach(function(f,i){ beep(f, 0.2, 'triangle', 0.05, i*0.13); });
+  }
+  function updateMuteUI(){
+    muteBtn.textContent = muted ? '\u2715' : '\u266A';
+    muteBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
+  }
+  muteBtn.addEventListener('click', function(){
+    muted = !muted;
+    try { localStorage.setItem('poph_muted', muted ? '1':'0'); } catch(e){}
+    updateMuteUI();
+  });
+
+  /* ---------------- helpers ---------------- */
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+  function showToast(msg, good){
+    toastEl.textContent = msg;
+    toastEl.classList.toggle('good', !!good);
+    toastEl.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(function(){ toastEl.classList.remove('show'); }, 900);
+  }
+
+  function setLives(n){
+    lives = n;
+    pips.forEach(function(pip, i){
+      pip.classList.toggle('lost', i >= lives);
+    });
+  }
+  function setScore(n){
+    score = n;
+    scoreEl.textContent = String(score).padStart(2,'0') + '/' + WIN_SCORE;
+  }
+
+  /* ---------------- sprites (drawn at low internal resolution, scaled via CSS => chunky pixels) ---------------- */
+  function drawBackground(){
+    ctx.fillStyle = PALETTE.paper;
+    ctx.fillRect(0,0,W,H);
+
+    // bar counter
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(0, H-13, W, 13);
+    ctx.fillStyle = PALETTE.paper;
+    ctx.fillRect(0, H-10, W, 1);
+  }
+
+  function drawPlayer(px, py){
+    var x = Math.round(px), y = Math.round(py);
+    // gown
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(x-10, y-13, 20, 15);
+    ctx.fillStyle = PALETTE.gown;
+    ctx.fillRect(x-9, y-12, 18, 13);
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(x-1, y-9, 2, 10);    // centre fold
+    // face
+    ctx.fillRect(x-5, y-18, 10, 7);
+    ctx.fillStyle = PALETTE.skin;
+    ctx.fillRect(x-4, y-17, 8, 5);
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(x-2, y-15, 1, 1);
+    ctx.fillRect(x+1, y-15, 1, 1);
+    // mortarboard
+    ctx.fillRect(x-4, y-23, 8, 4);
+    ctx.fillRect(x-11, y-20, 22, 2);
+    // tassel
+    ctx.fillStyle = PALETTE.tassel;
+    ctx.fillRect(x+9, y-18, 2, 6);
+    ctx.fillRect(x+8, y-12, 4, 2);
+  }
+
+  function drawMartini(x,y){
+    x = Math.round(x); y = Math.round(y);
+    ctx.fillStyle = PALETTE.ink;
+    ctx.beginPath();
+    ctx.moveTo(x-7,y-8); ctx.lineTo(x+7,y-8); ctx.lineTo(x,y+1);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = PALETTE.wine;
+    ctx.beginPath();
+    ctx.moveTo(x-5,y-7); ctx.lineTo(x+5,y-7); ctx.lineTo(x,y-1);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = PALETTE.olive;
+    ctx.fillRect(x-1,y-6,2,2);
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(x-1,y+1,2,4);
+    ctx.fillRect(x-4,y+5,8,2);
+  }
+  function drawWine(x,y){
+    x = Math.round(x); y = Math.round(y);
+    ctx.fillStyle = PALETTE.ink;
+    ctx.beginPath();
+    ctx.arc(x, y-3, 6, Math.PI*0.12, Math.PI*0.88);
+    ctx.fill();
+    ctx.fillStyle = PALETTE.wine;
+    ctx.beginPath();
+    ctx.arc(x, y-3, 4.5, Math.PI*0.1, Math.PI*0.9);
+    ctx.fill();
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(x-1,y+1,2,4);
+    ctx.fillRect(x-4,y+5,8,2);
+  }
+  function drawBeer(x,y){
+    x = Math.round(x); y = Math.round(y);
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(x-6,y-9,12,15);
+    ctx.fillStyle = PALETTE.beer;
+    ctx.fillRect(x-5,y-8,10,13);
+    ctx.fillStyle = PALETTE.paper;
+    ctx.fillRect(x-5,y-8,10,3);       // foam
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(x-5,y-5,10,1);
+    ctx.fillStyle = PALETTE.beerDark;
+    ctx.fillRect(x+2,y-4,3,9);        // shade
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(x+6,y-5,3,6);        // handle
+    ctx.fillStyle = PALETTE.paper;
+    ctx.fillRect(x+7,y-4,1,4);
+  }
+  // a colleague, mid-cheers: green blazer, glass already raised
+  function drawPeer(x,y){
+    x = Math.round(x); y = Math.round(y);
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(x-4,y-11,8,9);       // head
+    ctx.fillRect(x-5,y-3,10,10);      // body
+    ctx.fillRect(x-7,y-2,3,7);        // left arm
+    ctx.fillRect(x+4,y-7,3,8);        // right arm, raised
+    ctx.fillRect(x+3,y-10,5,4);       // glass
+    ctx.fillStyle = PALETTE.skin;
+    ctx.fillRect(x-3,y-8,6,4);        // face under the hairline
+    ctx.fillStyle = PALETTE.peer;
+    ctx.fillRect(x-4,y-2,8,8);        // blazer
+    ctx.fillRect(x-6,y-1,2,5);
+    ctx.fillRect(x+5,y-6,2,6);
+    ctx.fillStyle = PALETTE.beer;
+    ctx.fillRect(x+4,y-9,3,2);        // whatever is in the glass
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(x-2,y-7,1,1);        // glasses
+    ctx.fillRect(x+1,y-7,1,1);
+    ctx.fillRect(x-1,y-2,2,8);        // lapel
+  }
+
+  // someone with a hand up, always one more question
+  function drawQuestioner(x,y){
+    x = Math.round(x); y = Math.round(y);
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(x-4,y-11,8,9);       // head
+    ctx.fillRect(x-6,y-3,12,10);      // body
+    ctx.fillRect(x+4,y-10,4,9);       // raised arm
+    ctx.fillRect(x+3,y-13,5,4);       // hand
+    ctx.fillStyle = PALETTE.skin;
+    ctx.fillRect(x-3,y-8,6,4);        // face
+    ctx.fillRect(x+4,y-12,3,2);
+    ctx.fillStyle = PALETTE.pink;
+    ctx.fillRect(x-5,y-2,10,8);       // jacket
+    ctx.fillRect(x+5,y-9,2,7);        // sleeve
+    ctx.fillStyle = PALETTE.pinkDark;
+    ctx.fillRect(x-5,y-2,2,8);        // shade
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(x-2,y-7,1,1);        // eyes
+    ctx.fillRect(x+1,y-7,1,1);
+  }
+
+  // a committee is never one person
+  function drawCommittee(x,y){
+    x = Math.round(x); y = Math.round(y);
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(x-9,y-7,18,14);      // shared body block
+    ctx.fillStyle = PALETTE.pink;
+    ctx.fillRect(x-8,y-6,16,12);
+    ctx.fillStyle = PALETTE.pinkDark;
+    ctx.fillRect(x-3,y-6,1,12);       // seams between them
+    ctx.fillRect(x+2,y-6,1,12);
+    ctx.fillStyle = PALETTE.ink;
+    ctx.fillRect(x-8,y-13,5,6);       // three heads
+    ctx.fillRect(x-2,y-14,5,7);
+    ctx.fillRect(x+4,y-13,5,6);
+    ctx.fillStyle = PALETTE.skin;
+    ctx.fillRect(x-7,y-12,3,3);
+    ctx.fillRect(x-1,y-13,3,3);
+    ctx.fillRect(x+5,y-12,3,3);
+  }
+
+  // paperwork that needs you, whatever it is called this week
+  function drawPapers(x,y){
+    x = Math.round(x); y = Math.round(y);
+    var sheets = [[-6,4],[-5,1],[-6,-2],[-4,-5]];
+    for (var i=0; i<sheets.length; i++){
+      var ox = sheets[i][0], oy = sheets[i][1];
+      ctx.fillStyle = PALETTE.ink;
+      ctx.fillRect(x+ox, y+oy, 11, 3);
+      ctx.fillStyle = PALETTE.paper;
+      ctx.fillRect(x+ox+1, y+oy+1, 9, 1);
+    }
+    ctx.fillStyle = PALETTE.pinkDark;
+    ctx.fillRect(x-1, y-4, 4, 1);
+  }
+
+  // catching is generous, getting caught is forgiving.
+  // every item carries a label, because the labels are where the joke lives
+  var GOOD = [
+    { kind:'martini', draw:drawMartini, r:7.5, color:'#7d49cf', labels:['MARTINI'] },
+    { kind:'wine',    draw:drawWine,    r:7.5, color:'#7d49cf', labels:['WINE'] },
+    { kind:'beer',    draw:drawBeer,    r:7.5, color:'#b96f10', labels:['LAGER'] },
+    // no job titles on the good side: the guest list is small enough that a
+    // title names a person, and several of them are reading this
+    { kind:'peer',    draw:drawPeer,    r:7.5, color:'#0f8f68',
+      labels:['A COLLEAGUE','AN OLD CO-AUTHOR','GOOD COMPANY','A FRIENDLY FACE'] }
+  ];
+  var BAD = [
+    { kind:'committee', draw:drawCommittee,  r:6.5, color:'#d62d6c',
+      labels:['A COMMITTEE','A WORKING GROUP','A SUB-COMMITTEE','A TASK TEAM'],
+      toast:"YOU'VE BEEN CO-OPTED" },
+    { kind:'question',  draw:drawQuestioner, r:5.5, color:'#d62d6c',
+      labels:['A QUESTION','AN A.O.B.','A POINT OF ORDER','THE COMMITTEE SECRETARY'],
+      toast:'SORRY, ONE MORE QUESTION' },
+    { kind:'paperwork', draw:drawPapers,     r:5.5, color:'#d62d6c',
+      labels:['THE BUDGET','AN AUDIT','THE MINUTES','A STRATEGY DECK'],
+      toast:'IT NEEDS A SIGNATURE' }
+  ];
+
+  /* ---------------- game loop ---------------- */
+  function reset(){
+    setScore(0);
+    setLives(MAX_LIVES);
+    items = [];
+    spawnTimer = 0;
+    player.x = player.targetX = W/2;
+    flash = 0;
+  }
+
+  function difficultyFactor(){ return clamp(score / WIN_SCORE, 0, 1); }
+
+  function spawnItem(){
+    var bad = Math.random() < (0.22 + 0.10*difficultyFactor());
+    var table = bad ? BAD : GOOD;
+    var spec = table[Math.floor(Math.random()*table.length)];
+    items.push({
+      x: 14 + Math.random()*(W-28),
+      y: -12,
+      vy: (30 + 20*difficultyFactor()) + Math.random()*8,
+      bad: bad,
+      kind: spec.kind,
+      draw: spec.draw,
+      toast: spec.toast,
+      label: spec.labels[Math.floor(Math.random()*spec.labels.length)],
+      labelColor: spec.color,
+      r: spec.r
+    });
+  }
+
+  function update(dt){
+    // player follow
+    var targetStep = (player.targetX - player.x) * Math.min(1, dt*10);
+    player.x += targetStep;
+    if (keys.left) player.targetX -= 70*dt;
+    if (keys.right) player.targetX += 70*dt;
+    player.targetX = clamp(player.targetX, 12, W-12);
+    player.x = clamp(player.x, 12, W-12);
+
+    // spawn
+    spawnTimer -= dt;
+    if (spawnTimer <= 0){
+      spawnItem();
+      spawnTimer = clamp(0.9 - 0.35*difficultyFactor(), 0.45, 0.9) + Math.random()*0.15;
+    }
+
+    // items
+    for (var i = items.length-1; i>=0; i--){
+      var it = items[i];
+      it.y += it.vy*dt;
+      var caught = it.y > H-32 && it.y < H-12 && Math.abs(it.x-player.x) < (10+it.r);
+      if (caught){
+        items.splice(i,1);
+        if (it.bad){
+          setLives(lives-1);
+          flash = 1; flashColor = PALETTE.ink;
+          sfxHit();
+          showToast(it.toast);
+          if (lives <= 0){ triggerLose(); return; }
+        } else {
+          setScore(Math.min(WIN_SCORE, score+1));
+          flash = 0.45; flashColor = PALETTE.ink;
+          sfxCatch();
+          if (it.kind === 'peer') showToast('A COLLEAGUE JOINS YOU', true);
+          if (score >= WIN_SCORE){ triggerWin(); return; }
+        }
+        continue;
+      }
+      if (it.y > H+12) items.splice(i,1);
+    }
+
+    if (flash > 0) flash = Math.max(0, flash - dt*3.2);
+  }
+
+  function drawLabels(){
+    lctx.clearRect(0, 0, LW, LH);
+    lctx.font = '700 13px "DM Sans", system-ui, sans-serif';
+    lctx.textAlign = 'center';
+    lctx.textBaseline = 'middle';
+    lctx.lineJoin = 'round';
+    items.forEach(function(it){
+      var ly = it.y*LSCALE + 32;
+      if (it.y < 10 || ly > LH - 26) return;   // wait until the sprite itself is on screen
+      var half = lctx.measureText(it.label).width / 2;
+      var lx = clamp(it.x*LSCALE, half + 6, LW - half - 6);
+      lctx.strokeStyle = 'rgba(255,255,255,0.92)';
+      lctx.lineWidth = 4;
+      lctx.strokeText(it.label, lx, ly);
+      lctx.fillStyle = it.labelColor;
+      lctx.fillText(it.label, lx, ly);
+    });
+  }
+
+  function render(){
+    drawBackground();
+    items.forEach(function(it){ it.draw(it.x, it.y); });
+    drawPlayer(player.x, player.y);
+    drawLabels();
+    if (flash > 0){
+      ctx.globalAlpha = flash*0.35;
+      ctx.fillStyle = flashColor;
+      ctx.fillRect(0,0,W,H);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function loop(ts){
+    if (state !== 'playing'){ raf = null; return; }
+    var dt = lastTs ? Math.min(0.05, (ts-lastTs)/1000) : 0.016;
+    lastTs = ts;
+    update(dt);
+    if (state === 'playing'){
+      render();
+      raf = requestAnimationFrame(loop);
+    }
+  }
+
+  function startLoop(){
+    lastTs = 0;
+    if (!raf) raf = requestAnimationFrame(loop);
+  }
+
+  /* ---------------- state transitions ---------------- */
+  function goTitle(){
+    state = 'title';
+    screenTitle.hidden = false;
+    screenLose.hidden = true;
+    screenWin.hidden = true;
+    screenWin.classList.remove('show');
+    reset();
+    render();
+  }
+
+  function startGame(){
+    ensureAudio();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    reset();
+    state = 'playing';
+    screenTitle.hidden = true;
+    screenLose.hidden = true;
+    render();
+    startLoop();
+  }
+
+  function triggerLose(){
+    state = 'lose';
+    loseScoreEl.textContent = String(score);
+    screenLose.hidden = false;
+    sfxLose();
+  }
+
+  // every route out of the game ends here: won, lost, or skipped
+  function revealInvite(delay){
+    state = 'win';
+    setTimeout(function(){
+      screenWin.hidden = false;
+      requestAnimationFrame(function(){
+        requestAnimationFrame(function(){ screenWin.classList.add('show'); });
+      });
+    }, delay || 0);
+  }
+
+  function triggerWin(){
+    sfxWin();
+    revealInvite(420);
+  }
+
+  /* ---------------- input ---------------- */
+  document.getElementById('startBtn').addEventListener('click', startGame);
+  document.getElementById('retryBtn').addEventListener('click', startGame);
+  document.getElementById('skipBtn').addEventListener('click', function(){ revealInvite(0); });
+  document.getElementById('seeInviteBtn').addEventListener('click', function(){ revealInvite(0); });
+  document.getElementById('playAgainBtn').addEventListener('click', function(){
+    screenWin.classList.remove('show');
+    setTimeout(function(){ screenWin.hidden = true; goTitle(); }, 260);
+  });
+
+  // RSVP destination. Placeholder until the real link arrives: replace this one
+  // string with the Luma / form URL and nothing else needs to change.
+  var RSVP_URL = 'https://luma.com/6u29zo8a';
+
+  (function wireRsvp(){
+    var btn = document.getElementById('rsvpBtn');
+    if (!RSVP_URL) return;
+    btn.href = RSVP_URL;
+    btn.hidden = false;
+  })();
+
+  canvas.addEventListener('pointerdown', function(e){ handlePointer(e); });
+  canvas.addEventListener('pointermove', function(e){ if (e.buttons !== undefined && e.pointerType === 'mouse' && e.buttons === 0) { /* allow hover-follow on desktop */ } handlePointer(e); });
+  function handlePointer(e){
+    if (state !== 'playing') return;
+    var rect = canvas.getBoundingClientRect();
+    var scaleX = W / rect.width;
+    var localX = (e.clientX - rect.left) * scaleX;
+    player.targetX = clamp(localX, 12, W-12);
+  }
+
+  window.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { keys.left = true; e.preventDefault(); }
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { keys.right = true; e.preventDefault(); }
+    if ((e.key === 'Enter' || e.key === ' ') && state === 'title') startGame();
+  });
+  window.addEventListener('keyup', function(e){
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+  });
+
+  /* ---------------- boot / hot state ---------------- */
+  function boot(initial){
+    initial = initial || {};
+    reset();
+    if (initial.screen === 'win'){
+      setScore(WIN_SCORE);
+      screenTitle.hidden = true;
+      screenWin.hidden = false;
+      screenWin.classList.add('show');
+      state = 'win';
+    } else {
+      goTitle();
+    }
+  }
+
+  try{
+    if (window.claude && window.claude.hot){
+      window.claude.hot.snapshot(function(){
+        return { screen: state };
+      });
+      if (window.claude.hot.ready) window.claude.hot.ready(boot);
+      else boot(window.claude.hot.data || {});
+    } else {
+      boot({});
+    }
+  } catch(e){ boot({}); }
+
+})();
+</script>
